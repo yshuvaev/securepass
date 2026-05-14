@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SecurePass — защищённая передача секретов агенту</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d2e;
+    --border: #2a2d3e;
+    --accent: #7c6af7;
+    --accent-hover: #9d8fff;
+    --green: #22c55e;
+    --red: #ef4444;
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+    --code-bg: #0d1117;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 24px 16px 48px;
+  }
+  .container { max-width: 680px; margin: 0 auto; }
+  header { text-align: center; margin-bottom: 40px; }
+  header h1 { font-size: 2rem; font-weight: 700; letter-spacing: -0.5px; }
+  header h1 span { color: var(--accent); }
+  header p { color: var(--muted); margin-top: 8px; font-size: 0.95rem; line-height: 1.6; }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 20px;
+  }
+  .card h2 {
+    font-size: 1.05rem;
+    font-weight: 600;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .badge {
+    font-size: 0.7rem;
+    background: var(--accent);
+    color: #fff;
+    padding: 2px 8px;
+    border-radius: 99px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+  }
+  label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 6px; }
+  input[type=text], input[type=password], textarea {
+    width: 100%;
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 0.9rem;
+    padding: 10px 14px;
+    outline: none;
+    transition: border-color 0.2s;
+    font-family: inherit;
+  }
+  input:focus, textarea:focus { border-color: var(--accent); }
+  textarea { resize: vertical; min-height: 80px; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.82rem; }
+  .row { display: flex; gap: 12px; margin-bottom: 14px; }
+  .row > * { flex: 1; }
+  .field { margin-bottom: 14px; }
+  btn, button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 18px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+  }
+  button:hover { background: var(--accent-hover); }
+  button:active { transform: scale(0.97); }
+  button.secondary {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+  button.secondary:hover { border-color: var(--accent); color: var(--text); background: transparent; }
+  button.danger { background: var(--red); }
+  .btn-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+  .status {
+    font-size: 0.85rem;
+    padding: 8px 12px;
+    border-radius: 6px;
+    margin-bottom: 14px;
+  }
+  .status.ok { background: rgba(34,197,94,0.1); color: var(--green); border: 1px solid rgba(34,197,94,0.2); }
+  .status.err { background: rgba(239,68,68,0.1); color: var(--red); border: 1px solid rgba(239,68,68,0.2); }
+  .status.info { background: rgba(124,106,247,0.1); color: var(--accent); border: 1px solid rgba(124,106,247,0.2); }
+  .result-box {
+    background: var(--code-bg);
+    border: 1px solid var(--accent);
+    border-radius: 8px;
+    padding: 14px;
+    margin-top: 14px;
+    display: none;
+  }
+  .result-box label { color: var(--accent); margin-bottom: 8px; font-weight: 600; }
+  .result-box textarea { border: none; background: transparent; padding: 0; font-size: 0.85rem; word-break: break-all; }
+  .mono { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.8rem; word-break: break-all; color: var(--muted); }
+  details summary {
+    cursor: pointer;
+    color: var(--muted);
+    font-size: 0.85rem;
+    user-select: none;
+    margin-top: 14px;
+  }
+  details summary:hover { color: var(--text); }
+  details[open] summary { margin-bottom: 10px; }
+  .divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+  .tip {
+    font-size: 0.82rem;
+    color: var(--muted);
+    line-height: 1.6;
+    margin-top: 10px;
+  }
+  .tip strong { color: var(--text); }
+  #overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.6);
+    backdrop-filter: blur(4px);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+  }
+  #overlay.show { display: flex; }
+  #overlay-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 28px;
+    max-width: 480px;
+    width: 90%;
+    text-align: center;
+  }
+  #overlay-card h3 { margin-bottom: 12px; }
+  #overlay-card p { color: var(--muted); font-size: 0.9rem; margin-bottom: 20px; line-height: 1.6; }
+  .tabs { display: flex; gap: 4px; background: var(--code-bg); border-radius: 8px; padding: 4px; margin-bottom: 20px; }
+  .tab {
+    flex: 1; text-align: center; padding: 8px; border-radius: 6px;
+    cursor: pointer; font-size: 0.85rem; color: var(--muted);
+    transition: all 0.2s;
+  }
+  .tab.active { background: var(--surface); color: var(--text); font-weight: 600; }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>🔐 Secure<span>Pass</span></h1>
+    <p>Зашифруйте API-ключ, токен или пароль прямо в браузере.<br>
+       Агент получит его через Telegram — Telegram и LLM-провайдер видят только шифртекст.</p>
+  </header>
+
+  <!-- Keys card -->
+  <div class="card">
+    <h2>Мои ключи <span class="badge">localStorage</span></h2>
+    <div id="key-status" class="status info">Инициализация...</div>
+
+    <div class="tabs">
+      <div class="tab active" onclick="showTab('tab-use')">Зашифровать</div>
+      <div class="tab" onclick="showTab('tab-keys')">Мои ключи</div>
+      <div class="tab" onclick="showTab('tab-agent')">Ключ агента</div>
+    </div>
+
+    <!-- TAB: Encrypt -->
+    <div id="tab-use" class="tab-content active">
+      <div class="field">
+        <label>Имя секрета (переменная окружения)</label>
+        <input type="text" id="secret-name" placeholder="OPENAI_API_KEY, BOT_TOKEN, ..." autocomplete="off" spellcheck="false">
+      </div>
+      <div class="field">
+        <label>Значение секрета</label>
+        <input type="password" id="secret-value" placeholder="sk-..." autocomplete="off" spellcheck="false">
+      </div>
+      <button onclick="encryptSecret()">Зашифровать и получить сообщение</button>
+
+      <div class="result-box" id="result-box">
+        <label>Отправьте агенту в Telegram (скопируйте целиком):</label>
+        <textarea id="telegram-msg" rows="4" readonly onclick="this.select()"></textarea>
+        <div class="btn-row">
+          <button onclick="copyResult()">Скопировать</button>
+          <button class="secondary" onclick="clearResult()">Очистить</button>
+        </div>
+        <p class="tip" style="margin-top:10px">После отправки агенту скажите: <strong>«сохрани секрет из SecurePass»</strong> — он расшифрует и сохранит автоматически.</p>
+      </div>
+    </div>
+
+    <!-- TAB: My keys -->
+    <div id="tab-keys" class="tab-content">
+      <p class="tip">Ключи сгенерированы в браузере и хранятся только в <strong>localStorage</strong> этого устройства. Сохраните бэкап приватного ключа — без него нельзя зашифровать новые секреты после очистки браузера.</p>
+      <div class="btn-row" style="margin-top:14px">
+        <button onclick="copyPublicKey()">Скопировать публичный ключ</button>
+        <button class="secondary" onclick="showBackup()">Показать бэкап</button>
+        <button class="danger" onclick="confirmRegen()">Сгенерировать заново</button>
+      </div>
+      <hr class="divider">
+      <details>
+        <summary>Восстановить из бэкапа (вставить приватный ключ JWK)</summary>
+        <div style="margin-top:12px">
+          <textarea id="restore-input" rows="5" placeholder='{"kty":"EC","crv":"P-256","x":"...","y":"...","d":"...'></textarea>
+          <div class="btn-row">
+            <button onclick="restoreKeys()">Восстановить</button>
+          </div>
+        </div>
+      </details>
+    </div>
+
+    <!-- TAB: Agent key -->
+    <div id="tab-agent" class="tab-content">
+      <p class="tip" style="margin-bottom:12px">Публичный ключ агента встроен в страницу. Именно им шифруются ваши секреты — расшифровать может только агент, у которого есть парный приватный ключ.</p>
+      <label>Публичный ключ агента (JWK, P-256)</label>
+      <textarea id="agent-key-display" rows="4" readonly onclick="this.select()"></textarea>
+    </div>
+  </div>
+
+  <div class="tip" style="text-align:center">
+    Схема: ECDH (P-256) + AES-256-GCM &nbsp;·&nbsp; Все операции только в браузере &nbsp;·&nbsp; Ключи не покидают устройство
+  </div>
+</div>
+
+<!-- Overlay for backup / confirm regen -->
+<div id="overlay">
+  <div id="overlay-card">
+    <h3 id="overlay-title"></h3>
+    <p id="overlay-body"></p>
+    <textarea id="overlay-text" rows="6" readonly style="width:100%;margin-bottom:16px;display:none" onclick="this.select()"></textarea>
+    <div class="btn-row" style="justify-content:center">
+      <button id="overlay-ok" onclick="overlayOk()">OK</button>
+      <button class="secondary" onclick="closeOverlay()">Закрыть</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── Agent public key (hardcoded) ───────────────────────────────────────────
+const AGENT_JWK = {"kty":"EC","crv":"P-256","x":"Ap_J-2As9Xpl-3FcvAEzQU7UOkM1YYQqLBMetF_x6z4","y":"flOLiHh79Smqe5ujsgcsuGe4lI_-Wz4QSAaTz-dc3BQ"};
+const LS_KEY = 'securepass_private_key_v1';
+
+let agentPubKey = null;   // CryptoKey
+let userPrivKey = null;   // CryptoKey
+let userPubKey  = null;   // CryptoKey
+
+// ─── Init ────────────────────────────────────────────────────────────────────
+async function init() {
+  document.getElementById('agent-key-display').value = JSON.stringify(AGENT_JWK, null, 2);
+  try {
+    agentPubKey = await importAgentKey();
+    const saved = localStorage.getItem(LS_KEY);
+    if (saved) {
+      await loadFromJwk(JSON.parse(saved));
+      setStatus('ok', '✅ Ключи загружены из localStorage');
+    } else {
+      await generateKeys(false);
+    }
+  } catch(e) {
+    setStatus('err', '❌ Ошибка инициализации: ' + e.message);
+  }
+}
+
+async function importAgentKey() {
+  return crypto.subtle.importKey(
+    'jwk', AGENT_JWK,
+    {name:'ECDH', namedCurve:'P-256'},
+    true, []
+  );
+}
+
+async function generateKeys(confirm=true) {
+  if (confirm && !window.confirm('Сгенерировать новую пару ключей? Старый приватный ключ будет удалён из localStorage.')) return;
+  const kp = await crypto.subtle.generateKey(
+    {name:'ECDH', namedCurve:'P-256'}, true, ['deriveBits']
+  );
+  userPrivKey = kp.privateKey;
+  userPubKey  = kp.publicKey;
+  const jwk = await crypto.subtle.exportKey('jwk', kp.privateKey);
+  localStorage.setItem(LS_KEY, JSON.stringify(jwk));
+  setStatus('ok', '✅ Новые ключи сгенерированы и сохранены');
+}
+
+async function loadFromJwk(privJwk) {
+  userPrivKey = await crypto.subtle.importKey(
+    'jwk', privJwk, {name:'ECDH', namedCurve:'P-256'}, true, ['deriveBits']
+  );
+  const pubJwk = {kty:privJwk.kty, crv:privJwk.crv, x:privJwk.x, y:privJwk.y};
+  userPubKey = await crypto.subtle.importKey(
+    'jwk', pubJwk, {name:'ECDH', namedCurve:'P-256'}, true, []
+  );
+}
+
+// ─── Encrypt ─────────────────────────────────────────────────────────────────
+async function encryptSecret() {
+  const name  = document.getElementById('secret-name').value.trim().toUpperCase().replace(/\s+/g,'_');
+  const value = document.getElementById('secret-value').value;
+  if (!name)  { alert('Введите имя секрета'); return; }
+  if (!value) { alert('Введите значение секрета'); return; }
+  if (!userPrivKey || !agentPubKey) { alert('Ключи не загружены'); return; }
+
+  // ECDH → raw 256 bits (= raw x-coordinate of shared point)
+  const sharedBits = await crypto.subtle.deriveBits(
+    {name:'ECDH', public: agentPubKey}, userPrivKey, 256
+  );
+
+  const aesKey = await crypto.subtle.importKey(
+    'raw', sharedBits, {name:'AES-GCM'}, false, ['encrypt']
+  );
+
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+
+  const enc = new TextEncoder();
+  const ctBuf = await crypto.subtle.encrypt(
+    {name:'AES-GCM', iv}, aesKey, enc.encode(value)
+  );
+
+  // User public key (uncompressed, 65 bytes)
+  const pubRaw = await crypto.subtle.exportKey('raw', userPubKey); // 65 bytes
+
+  // Concat: pubKey(65) + iv(12) + ciphertext
+  const blob = new Uint8Array(pubRaw.byteLength + 12 + ctBuf.byteLength);
+  blob.set(new Uint8Array(pubRaw), 0);
+  blob.set(iv, pubRaw.byteLength);
+  blob.set(new Uint8Array(ctBuf), pubRaw.byteLength + 12);
+
+  const b64 = btoa(String.fromCharCode(...blob));
+  const msg = `🔐${name}:${b64}`;
+
+  document.getElementById('telegram-msg').value = msg;
+  document.getElementById('result-box').style.display = 'block';
+  document.getElementById('secret-value').value = '';
+}
+
+function clearResult() {
+  document.getElementById('result-box').style.display = 'none';
+  document.getElementById('telegram-msg').value = '';
+  document.getElementById('secret-name').value = '';
+}
+
+async function copyResult() {
+  await navigator.clipboard.writeText(document.getElementById('telegram-msg').value);
+  flashBtn(event.target, 'Скопировано!');
+}
+
+async function copyPublicKey() {
+  if (!userPubKey) return;
+  const jwk = await crypto.subtle.exportKey('jwk', userPubKey);
+  await navigator.clipboard.writeText(JSON.stringify(jwk));
+  flashBtn(event.target, 'Скопировано!');
+}
+
+// ─── Backup / Restore ────────────────────────────────────────────────────────
+async function showBackup() {
+  const saved = localStorage.getItem(LS_KEY);
+  if (!saved) { alert('Ключи не загружены'); return; }
+  showOverlay(
+    'Бэкап приватного ключа',
+    '⚠️ Сохраните в надёжном месте (1Password, Bitwarden, зашифрованный файл). Не передавайте никому.',
+    saved,
+    null
+  );
+}
+
+async function restoreKeys() {
+  const input = document.getElementById('restore-input').value.trim();
+  if (!input) return;
+  try {
+    const jwk = JSON.parse(input);
+    await loadFromJwk(jwk);
+    localStorage.setItem(LS_KEY, JSON.stringify(jwk));
+    document.getElementById('restore-input').value = '';
+    setStatus('ok', '✅ Ключи восстановлены из бэкапа');
+  } catch(e) {
+    alert('Ошибка: ' + e.message);
+  }
+}
+
+function confirmRegen() {
+  showOverlay(
+    'Сгенерировать новые ключи?',
+    'Старый приватный ключ будет удалён из localStorage. Убедитесь, что у вас есть его бэкап — иначе исторические зашифрованные секреты нельзя будет восстановить.',
+    null,
+    async () => { closeOverlay(); await generateKeys(false); }
+  );
+}
+
+// ─── Overlay ─────────────────────────────────────────────────────────────────
+let _overlayOkFn = null;
+function showOverlay(title, body, text, okFn) {
+  document.getElementById('overlay-title').textContent = title;
+  document.getElementById('overlay-body').textContent  = body;
+  const ta = document.getElementById('overlay-text');
+  if (text) { ta.value = text; ta.style.display = 'block'; } else { ta.style.display = 'none'; }
+  _overlayOkFn = okFn;
+  document.getElementById('overlay-ok').style.display = okFn ? 'inline-flex' : 'none';
+  document.getElementById('overlay').classList.add('show');
+}
+function closeOverlay() { document.getElementById('overlay').classList.remove('show'); }
+function overlayOk() { if (_overlayOkFn) _overlayOkFn(); }
+
+// ─── Tabs ────────────────────────────────────────────────────────────────────
+function showTab(id) {
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  const idx = ['tab-use','tab-keys','tab-agent'].indexOf(id);
+  document.querySelectorAll('.tab')[idx].classList.add('active');
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+function setStatus(type, msg) {
+  const el = document.getElementById('key-status');
+  el.className = 'status ' + type;
+  el.textContent = msg;
+}
+
+function flashBtn(btn, text) {
+  const orig = btn.textContent;
+  btn.textContent = text;
+  setTimeout(() => btn.textContent = orig, 2000);
+}
+
+init();
+</script>
+</body>
+</html>
